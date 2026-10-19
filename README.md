@@ -1,4 +1,4 @@
-# Utility Library Project
+# QE Foundations
 #### A library containing utility fuctions for working with strings, numbers, dates, and data generation
 
 ##### Project 1 milestone - Week 2, Monday
