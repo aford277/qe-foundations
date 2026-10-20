@@ -21,4 +21,30 @@ def validate_record(row, raw):
 
     Returns {"id": str, "title": str, "status": str, "duration": float}.
     """
-    raise NotImplementedError("Task 5: write validate_record")
+    if not isinstance(raw, dict):
+        raise InvalidValueError(row, "record", raw, "an object")
+    for field in REQUIRED_FIELDS:
+        value = raw.get(field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            raise MissingFieldError(row, field)
+    if str(raw["status"]).strip().lower() not in VALID_STATUSES:
+        raise InvalidValueError(row, "status", raw["status"], "pass, fail, or blocked")
+    
+    duration = raw["duration"]    
+    if isinstance(duration, bool):
+        raise InvalidValueError(row, "duration", duration, "a non-negative number")
+
+    try:
+        number = float(duration)
+    except(ValueError, TypeError) as error:
+        raise InvalidValueError(row, "duration", duration, "a non-negative number")
+
+    if number != number or number in (float("inf"), float("-inf")) or number < 0:
+        raise InvalidValueError(row, "duration", duration, "a non-negative number")
+
+    return {
+        "id": str(raw["id"]).strip(),
+        "title": str(raw["title"]).strip(),
+        "status": str(raw["status"]).strip().lower(),
+        "duration": number,
+    }
