@@ -87,7 +87,6 @@ class TestLoadTestCases(unittest.TestCase):
         # Act + Assert
         with self.assertRaises(MissingColumnsError) as ctx:
             load_test_cases(path)
-        # TODO: then check that "duration" is in ctx.exception.missing
         self.assertIn("duration", ctx.exception.missing)
 
 
