@@ -10,6 +10,7 @@ Accepts one or more files and/or folders. Exit code 0 = every source was readabl
 import sys
 from pathlib import Path
 
+from ..utils.logging_setup import setup_logging
 from .exceptions import SourceError
 from .loader import load_directory, load_test_cases
 
@@ -21,6 +22,8 @@ def print_report(report):
 
 
 def main(argv):
+    setup_logging(level="INFO", logfile="ingestion.log")
+
     if not argv:
         print("usage: python -m qe_foundations.ingestion <file-or-folder> [...]")
         return 2
