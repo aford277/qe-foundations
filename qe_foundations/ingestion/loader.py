@@ -12,6 +12,7 @@ and the READERS lookup table. You write the TODOs.
 """
 
 import csv
+import logging
 from pathlib import Path
 
 from .contexts import LoadSession
@@ -24,6 +25,8 @@ from .exceptions import (
 )
 from .readers import read_csv_records, read_json_records, read_xml_records
 from .validation import validate_record
+
+logger = logging.getLogger(__name__)
 
 # Which reader handles which file extension (always compare lower-case suffixes).
 READERS = {
@@ -117,29 +120,43 @@ def load_test_cases(path):
     * call report.check_invariants() before returning
     """
     path = Path(path)
-
-    with LoadSession(path):
-        reader = READERS.get(path.suffix.lower())
-        if reader is None:
-            raise UnsupportedFormatError(path, path.suffix)
-
-        raw_records = reader(path)
-        report = IngestionReport(path.name, rows_seen=len(raw_records))
-
-        seen_ids = set()
-        for row, raw in enumerate(raw_records, start=1):
-            try:
-                clean = validate_record(row, raw)
-                if clean["id"] in seen_ids:
-                    raise DuplicateIdError(row, clean["id"])
-            except RecordValidationError as error:
-                report.rejected.append(error)
-            else:
-                seen_ids.add(clean["id"])
-                report.valid.append(clean)
-
-        report.check_invariants()
-        return report
+    logger.info("Loading %s", path.name)
+ 
+    try:
+        with LoadSession(path) as session:
+            reader = READERS.get(path.suffix.lower())
+            if reader is None:
+                raise UnsupportedFormatError(path, path.suffix)
+ 
+            raw_records = reader(path)
+            logger.debug("%s: reader returned %d raw records", path.name, len(raw_records))
+            report = IngestionReport(path.name, rows_seen=len(raw_records))
+ 
+            seen_ids = set()
+            for row, raw in enumerate(raw_records, start=1):
+                try:
+                    clean = validate_record(row, raw)
+                    if clean["id"] in seen_ids:
+                        raise DuplicateIdError(row, clean["id"])
+                except RecordValidationError as error:
+                    logger.warning("%s: skipped - %s", path.name, error)
+                    report.rejected.append(error)
+                else:
+                    seen_ids.add(clean["id"])
+                    report.valid.append(clean)
+ 
+            report.check_invariants()
+    except SourceError as error:
+        # Log it, then re-raise unchanged: the error policy says SourceErrors propagate.
+        logger.error("Source failed: %s", error)
+        raise
+ 
+    logger.info(
+        "Loaded %s: %d good rows, %d bad rows",
+        path.name, len(report.valid), len(report.rejected),
+    )
+    logger.debug("%s: session %s in %.3f s", path.name, session.outcome, session.elapsed)
+    return report
 
 
 def load_directory(folder):
@@ -151,16 +168,21 @@ def load_directory(folder):
     """
     folder = Path(folder)
     if not folder.is_dir():
+        logger.error("Folder not found: %s", folder)
         raise SourceNotFoundError(folder)
 
+    logger.info("Loading folder %s", folder)
     batch = BatchResult()
     for item in sorted(folder.iterdir(), key=lambda p: p.name):
         if not item.is_file():
+            logger.debug("Skipping sub-folder %s", item.name)
             continue
         try:
             batch.reports.append(load_test_cases(item))
         except SourceError as error:
             batch.failed_sources.append(error)
+
+    logger.info("Finished folder %s: %s", folder.name, batch.totals())        
     return batch
 
 
@@ -179,4 +201,5 @@ def write_rejected_csv(report, out_path):
         writer.writeheader()
         writer.writerows(report.rejected_rows())
 
+    logger.info("Wrote %d rejected rows to %s", len(report.rejected), out_path)
     return out_path

@@ -35,7 +35,7 @@ def open_source(path):
     try:
         yield file
     except UnicodeDecodeError as error:
-        raise MalformedSourceError(path, f"invalid encoding ({error.reason}") from error
+        raise MalformedSourceError(path, f"invalid encoding ({error.reason})") from error
     finally:
         file.close()
 

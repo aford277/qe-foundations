@@ -50,7 +50,7 @@ class SourceUnreadableError(SourceError):
     """The path exists but cannot be read (permissions, it is a folder, ...)."""
 
     def __init__(self, path, os_error):
-        super().__init__(path, f"cannt be read ({type(os_error).__name__})")
+        super().__init__(path, f"can't be read ({type(os_error).__name__})")
 
 
 class UnsupportedFormatError(SourceError):
